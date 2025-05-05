@@ -1,4 +1,3 @@
-```python
 import telebot
 from telethon import TelegramClient, events, sync, functions, types
 from telethon.tl.functions.messages import GetDialogsRequest
@@ -16,7 +15,7 @@ import re
 import schedule
 from collections import defaultdict
 
-# تنظیمات لاگینگ
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
@@ -24,21 +23,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# تنظیمات API تلگرام
+
 api_id = 'YOUR_API_ID'
 api_hash = 'YOUR_API_HASH'
 bot_token = 'YOUR_BOT_TOKEN'
-admin_ids = [123456789] # شناسه‌های ادمین‌های ربات
+admin_ids = [123456789] 
 
-# ایجاد کلاینت تلگرام
+
 client = TelegramClient('advanced_session', api_id, api_hash)
 bot = telebot.TeleBot(bot_token)
 
-# تنظیمات دیتابیس
+
 conn = sqlite3.connect('bot_database.db')
 cursor = conn.cursor()
 
-# ایجاد جداول مورد نیاز
+
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS groups
 (group_id INTEGER PRIMARY KEY, 
@@ -67,7 +66,7 @@ last_response TEXT)
 
 conn.commit()
 
-# تنظیمات پیام‌ها با اولویت‌بندی
+
 messages = {
     'kermanshah': [
         {'text': "پیام ویژه کرمانشاه 1", 'priority': 1},
@@ -86,14 +85,14 @@ messages = {
     ]
 }
 
-# تنظیمات محدودیت‌ها
+
 rate_limits = {
-    'group_join': 20,  # تعداد گروه‌های قابل جوین در ساعت
-    'message_send': 30, # تعداد پیام قابل ارسال در دقیقه
-    'keyword_cooldown': 300  # فاصله زمانی بین پاسخ به کلیدواژه‌های مشابه (ثانیه)
+    'group_join': 20,  
+    'message_send': 30, 
+    'keyword_cooldown': 300 
 }
 
-# ذخیره آمار
+
 message_stats = defaultdict(lambda: {'count': 0, 'last_time': None})
 group_stats = defaultdict(dict)
 
@@ -153,7 +152,7 @@ class AdvancedBot:
         message_text = event.message.text.lower()
         group_id = event.chat_id
         
-        # بررسی محدودیت‌های زمانی
+        
         current_time = time.time()
         if group_id in self.last_responses:
             if current_time - self.last_responses[group_id] < rate_limits['keyword_cooldown']:
@@ -283,13 +282,13 @@ class AdvancedBot:
 async def main():
     bot = AdvancedBot()
     
-    # راه‌اندازی تسک‌های اصلی
+    
     tasks = [
         asyncio.create_task(bot.smart_join_groups()),
         asyncio.create_task(bot.message_sender())
     ]
     
-    # تنظیم وظایف دوره‌ای
+    
     schedule.every().hour.do(lambda: asyncio.create_task(bot.smart_join_groups()))
     schedule.every().day.at("00:00").do(lambda: asyncio.create_task(bot.cleanup_inactive_groups()))
     schedule.every().day.at("20:00").do(lambda: asyncio.create_task(bot.generate_report()))
@@ -310,40 +309,3 @@ if __name__ == '__main__':
     finally:
         conn.close()
         client.disconnect()
-```
-
-این نسخه پیشرفته شامل قابلیت‌های زیر است:
-
-1. مدیریت پایگاه داده SQLite برای ذخیره اطلاعات گروه‌ها و آمار
-
-2. سیستم اولویت‌بندی پیام‌ها
-
-3. مدیریت هوشمند محدودیت‌ها و جلوگیری از اسپم
-
-4. سیستم صف پیام برای ارسال کنترل شده
-
-5. گزارش‌گیری خودکار و ارسال به ادمین‌ها
-
-6. پاکسازی خودکار گروه‌های غیرفعال
-
-7. لاگینگ پیشرفته برای عیب‌یابی
-
-8. مدیریت خطاهای احتمالی
-
-9. آمارگیری دقیق از عملکرد ربات
-
-10. قابلیت تنظیم کولدان برای پاسخ‌ها
-
-11. امکان تنظیم اولویت برای پیام‌های مختلف
-
-برای استفاده نیاز به نصب کتابخانه‌های زیر است:
-
-```bash
-pip install telethon
-pip install pyTelegramBotAPI
-pip install schedule
-```
-
-همچنین باید مقادیر api_id، api_hash و bot_token را تنظیم کنید و لیست پیام‌ها را در بخش messages کامل کنید.
-
-این نسخه بسیار پایدارتر و هوشمندتر از نسخه قبلی است و قابلیت‌های مدیریتی و نظارتی بیشتری دارد.
