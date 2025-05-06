@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 api_id = '20508268'
 api_hash = '65d0d52b67f1e6d7256f22fb13864cd0'
 bot_token = '7997960421:AAGvgLwhelNC4Xw9mhbdoKYGHWYud38z3Ic'
-admin_ids = [426815385] 
+admin_ids = 5528371749
 
 
 client = TelegramClient('advanced_session', api_id, api_hash)
