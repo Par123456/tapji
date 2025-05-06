@@ -24,10 +24,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-api_id = 'YOUR_API_ID'
-api_hash = 'YOUR_API_HASH'
-bot_token = 'YOUR_BOT_TOKEN'
-admin_ids = [123456789] 
+api_id = '20508268'
+api_hash = '65d0d52b67f1e6d7256f22fb13864cd0'
+bot_token = '7997960421:AAGvgLwhelNC4Xw9mhbdoKYGHWYud38z3Ic'
+admin_ids = [426815385] 
 
 
 client = TelegramClient('advanced_session', api_id, api_hash)
