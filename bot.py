@@ -15,7 +15,7 @@ import re
 import schedule
 from collections import defaultdict
 
-
+# تنظیمات لاگینگ
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
@@ -23,75 +23,72 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
+# تنظیمات API
 api_id = '20508268'
 api_hash = '65d0d52b67f1e6d7256f22fb13864cd0'
 bot_token = '7997960421:AAGvgLwhelNC4Xw9mhbdoKYGHWYud38z3Ic'
-admin_ids = 5528371749
+admin_ids = [5528371749]
 
-
+# ایجاد کلاینت‌ها
 client = TelegramClient('advanced_session', api_id, api_hash)
 bot = telebot.TeleBot(bot_token)
 
-
-conn = sqlite3.connect('bot_database.db')
+# اتصال به دیتابیس
+conn = sqlite3.connect('bot_database.db', check_same_thread=False)
 cursor = conn.cursor()
 
+# ایجاد جداول
+def setup_database():
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS groups
+    (group_id INTEGER PRIMARY KEY, 
+    name TEXT,
+    join_date TEXT,
+    member_count INTEGER,
+    last_activity TEXT)
+    ''')
 
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS groups
-(group_id INTEGER PRIMARY KEY, 
-name TEXT,
-join_date TEXT,
-member_count INTEGER,
-last_activity TEXT)
-''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS messages
+    (message_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    keyword TEXT,
+    message_text TEXT,
+    priority INTEGER)
+    ''')
 
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS messages
-(message_id INTEGER PRIMARY KEY AUTOINCREMENT,
-keyword TEXT,
-message_text TEXT,
-priority INTEGER)
-''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS stats
+    (stat_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER,
+    keyword TEXT,
+    response_count INTEGER,
+    last_response TEXT)
+    ''')
 
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS stats
-(stat_id INTEGER PRIMARY KEY AUTOINCREMENT,
-group_id INTEGER,
-keyword TEXT,
-response_count INTEGER,
-last_response TEXT)
-''')
+    conn.commit()
 
-conn.commit()
-
-
+# تنظیم پیام‌ها
 messages = {
     'kermanshah': [
         {'text': "پیام ویژه کرمانشاه 1", 'priority': 1},
         {'text': "پیام ویژه کرمانشاه 2", 'priority': 2},
-        # افزودن پیام‌های بیشتر
     ],
     'mobile': [
         {'text': "پیام ویژه موبایل 1", 'priority': 1},
         {'text': "پیام ویژه موبایل 2", 'priority': 2},
-        # افزودن پیام‌های بیشتر
     ],
     'phone': [
         {'text': "پیام ویژه گوشی 1", 'priority': 1},
         {'text': "پیام ویژه گوشی 2", 'priority': 2},
-        # افزودن پیام‌های بیشتر
     ]
 }
 
-
+# محدودیت‌ها
 rate_limits = {
-    'group_join': 20,  
-    'message_send': 30, 
-    'keyword_cooldown': 300 
+    'group_join': 20,
+    'message_send': 30,
+    'keyword_cooldown': 300
 }
-
 
 message_stats = defaultdict(lambda: {'count': 0, 'last_time': None})
 group_stats = defaultdict(dict)
@@ -120,7 +117,7 @@ class AdvancedBot:
         """بررسی امکان جوین شدن در گروه"""
         hour_ago = datetime.now() - timedelta(hours=1)
         cursor.execute("SELECT COUNT(*) FROM groups WHERE join_date > ?", (hour_ago.strftime('%Y-%m-%d %H:%M:%S'),))
-        recent_joins = cursor.execute().fetchone()[0]
+        recent_joins = cursor.fetchone()[0]
         return recent_joins < rate_limits['group_join']
 
     async def join_and_initialize_group(self, group):
@@ -129,7 +126,6 @@ class AdvancedBot:
             await client(JoinChannelRequest(group))
             self.joined_groups.add(group.id)
             
-            # ذخیره اطلاعات گروه
             cursor.execute("""
                 INSERT INTO groups (group_id, name, join_date, member_count, last_activity)
                 VALUES (?, ?, ?, ?, ?)
@@ -138,7 +134,6 @@ class AdvancedBot:
                   datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
             conn.commit()
 
-            await self.send_welcome_message(group)
             logger.info(f"Successfully joined and initialized group: {group.title}")
             
         except Exception as e:
@@ -151,7 +146,6 @@ class AdvancedBot:
 
         message_text = event.message.text.lower()
         group_id = event.chat_id
-        
         
         current_time = time.time()
         if group_id in self.last_responses:
@@ -169,8 +163,6 @@ class AdvancedBot:
         for keyword in keywords_found:
             await self.queue_response(event, keyword)
             self.last_responses[group_id] = current_time
-            
-            # بروزرسانی آمار
             self.update_stats(group_id, keyword)
 
     async def queue_response(self, event, keyword):
@@ -279,33 +271,52 @@ class AdvancedBot:
             except Exception as e:
                 logger.error(f"Error sending report to admin {admin_id}: {e}")
 
-async def main():
-    bot = AdvancedBot()
-    
-    
-    tasks = [
-        asyncio.create_task(bot.smart_join_groups()),
-        asyncio.create_task(bot.message_sender())
-    ]
-    
-    
-    schedule.every().hour.do(lambda: asyncio.create_task(bot.smart_join_groups()))
-    schedule.every().day.at("00:00").do(lambda: asyncio.create_task(bot.cleanup_inactive_groups()))
-    schedule.every().day.at("20:00").do(lambda: asyncio.create_task(bot.generate_report()))
+async def schedule_checker():
+    while True:
+        schedule.run_pending()
+        await asyncio.sleep(1)
 
+async def main():
+    # راه‌اندازی دیتابیس
+    setup_database()
+    
+    # ایجاد نمونه از بات
+    bot_instance = AdvancedBot()
+    
+    # ثبت هندلر پیام‌ها
     @client.on(events.NewMessage(pattern='.*'))
     async def message_handler(event):
-        await bot.smart_message_handler(event)
+        await bot_instance.smart_message_handler(event)
+
+    # ایجاد تسک‌های اصلی
+    tasks = [
+        asyncio.create_task(bot_instance.smart_join_groups()),
+        asyncio.create_task(bot_instance.message_sender()),
+        asyncio.create_task(schedule_checker())
+    ]
+
+    # تنظیم زمانبندی‌ها
+    schedule.every().hour.do(lambda: asyncio.create_task(bot_instance.smart_join_groups()))
+    schedule.every().day.at("00:00").do(lambda: asyncio.create_task(bot_instance.cleanup_inactive_groups()))
+    schedule.every().day.at("20:00").do(lambda: asyncio.create_task(bot_instance.generate_report()))
 
     print("Advanced Bot started successfully!")
-    await client.run_until_disconnected()
+    
+    # اجرای همه تسک‌ها
+    await asyncio.gather(*tasks)
 
 if __name__ == '__main__':
     try:
+        # راه‌اندازی کلاینت
         client.start()
+        
+        # اجرای لوپ اصلی
         client.loop.run_until_complete(main())
     except KeyboardInterrupt:
         print("\nBot stopped by user")
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        logger.error(f"Critical error: {e}")
     finally:
         conn.close()
         client.disconnect()
